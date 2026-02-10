@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>カオス・クッキング・キャッチ</title>
+    <style>
+        body { text-align: center; background: #f0f0f0; font-family: sans-serif; overflow: hidden; margin: 0; }
+        canvas { 
+            background: #fff; 
+            border: 4px solid #333; 
+            max-width: 100%; /* スマホ画面からはみ出さない */
+            height: auto; 
+            touch-action: none; /* 指で触れた時に画面が揺れるのを防ぐ */
+        }
+        #result { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                  background: rgba(255,255,255,0.95); padding: 20px; border-radius: 20px; border: 5px solid #ff5722; width: 80%; }
+        button { font-size: 20px; padding: 10px 20px; border-radius: 10px; background: #ff5722; color: white; border: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <h1>変な料理を作ろう！</h1>
+    <p>左右に動かして材料を10個拾え！</p>
+    <canvas id="gameCanvas" width="600" height="400"></canvas>
+
+    <div id="result">
+        <h2 id="dishName"></h2>
+        <p id="dishDesc"></p>
+        <button onclick="location.reload()">もう一度作る</button>
+    </div>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+const resultDiv = document.getElementById("result");
+
+const items = [
+    { name: 'イチゴ', icon: '🍓', type: 'sweet' },
+    { name: 'サバ', icon: '🐟', type: 'fish' },
+    { name: 'ネジ', icon: '🔩', type: 'metal' },
+    { name: '謎の液体', icon: '🧪', type: 'weird' },
+    { name: 'ケーキ', icon: '🍰', type: 'sweet' },
+    { name: 'タイヤ', icon: '🛞', type: 'gross' }
+];
+
+let basket = { x: 250, y: 350, width: 80, height: 40 };
+let fallingItems = [];
+let caughtItems = [];
+let score = 0;
+let gameOver = false;
+
+// --- ここからスマホ・PC共通の操作処理 ---
+
+function moveBasket(clientX) {
+    let rect = canvas.getBoundingClientRect();
+    // 画面サイズに対するマウス/指の比率を計算して鍋を動かす
+    let scaleX = canvas.width / rect.width;
+    basket.x = (clientX - rect.left) * scaleX - basket.width / 2;
+}
+
+// マウス操作
+canvas.addEventListener('mousemove', (e) => {
+    moveBasket(e.clientX);
+});
+
+// タッチ操作（スマホ）
+canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault(); // スクロール防止
+    moveBasket(e.touches[0].clientX);
+}, { passive: false });
+
+// --- ここまで ---
+
+function spawnItem() {
+    if (gameOver) return;
+    const item = items[Math.floor(Math.random() * items.length)];
+    fallingItems.push({ ...item, x: Math.random() * (canvas.width - 30), y: -30, speed: 2 + Math.random() * 3 });
+    setTimeout(spawnItem, 800);
+}
+
+function update() {
+    if (gameOver) return;
+    fallingItems.forEach((item, index) => {
+        item.y += item.speed;
+        if (item.y + 30 > basket.y && item.x > basket.x && item.x < basket.x + basket.width) {
+            caughtItems.push(item);
+            fallingItems.splice(index, 1);
+            score++;
+            // スマホなら振動させる（対応機種のみ）
+            if (window.navigator.vibrate) window.navigator.vibrate(50);
+            if (score >= 10) finishGame();
+        }
+        if (item.y > canvas.height) fallingItems.splice(index, 1);
+    });
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#555";
+    ctx.fillRect(basket.x, basket.y, basket.width, basket.height);
+    ctx.font = "20px Arial";
+    ctx.fillText("🍲鍋", basket.x + 15, basket.y + 25);
+    fallingItems.forEach(item => {
+        ctx.font = "30px Arial";
+        ctx.fillText(item.icon, item.x, item.y);
+    });
+    if (!gameOver) requestAnimationFrame(() => { update(); draw(); });
+}
+
+function finishGame() {
+    gameOver = true;
+    resultDiv.style.display = "block";
+    const prefixes = ["伝説の", "虚無の", "ドロドロな", "ピカピカの", "魔界の"];
+    const suffixes = ["スープ", "炒め", "サラダ", "煮込み", "オブジェ"];
+    let name = prefixes[Math.floor(Math.random() * prefixes.length)] + 
+               caughtItems[0].name + "と" + caughtItems[caughtItems.length-1].name + "の" +
+               suffixes[Math.floor(Math.random() * suffixes.length)];
+    document.getElementById("dishName").innerText = "完成！\n" + name;
+    document.getElementById("dishDesc").innerText = caughtItems.map(i => i.icon).join("") + "\nを混ぜてみたぞ！";
+}
+
+spawnItem();
+draw();
+</script>
+</body>
+</html>
